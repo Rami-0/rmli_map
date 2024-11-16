@@ -9,8 +9,9 @@ const Layout: FC<PropsWithChildren> = ({ children }) => {
   const pathname = usePathname();
   return (
     <>
-      <Header />
-      <main className='w-full bg-[#f8f8f8]'>{children}</main>
+
+      {pathname === '/' && <Header />}
+      {children}
       {pathname === '/' && <Footer />}
     </>
   );
