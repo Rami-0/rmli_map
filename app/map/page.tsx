@@ -1,10 +1,8 @@
-import MapPage from '@/pages/MapPage'
-import React from 'react'
+import MapPage from '@/pages/MapPage';
+import React from 'react';
 
 function Map() {
-    return (
-        <MapPage />
-    )
+  return <MapPage />;
 }
 
 export default Map;
