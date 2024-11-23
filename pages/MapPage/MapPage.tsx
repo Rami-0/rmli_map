@@ -9,28 +9,37 @@ import {
     TransformComponent,
     ReactZoomPanPinchRef,
 } from "react-zoom-pan-pinch";
+import MapMobile from "@/components/ui/map-mob/MapMobile";
 
 
 
 const MapPage: React.FC = () => {
     const { width } = useWindowDimensions();
 
+    console.log(width);
+
+
+    if (width == undefined) return <p>loading</p>
     return (
-
-        <TransformWrapper
-            initialScale={1}
-        >
-            {(utils) => (
-                <React.Fragment>
-                    <MapController {...utils} />
-                    <TransformComponent>
-                        <Map />
-                    </TransformComponent>
-                </React.Fragment>
-            )}
-        </TransformWrapper>
-
-
+        <>
+            {
+                width >= 1000 ?
+                    <TransformWrapper
+                        initialScale={1}
+                    >
+                        {(utils) => (
+                            <React.Fragment>
+                                <MapController {...utils} />
+                                <TransformComponent>
+                                    <Map />
+                                </TransformComponent>
+                            </React.Fragment>
+                        )}
+                    </TransformWrapper>
+                    :
+                    <MapMobile />
+            }
+        </>
 
     );
 };
