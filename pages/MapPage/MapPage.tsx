@@ -7,7 +7,6 @@ import MapController from "@/components/ui/map-controller/MapController";
 import {
     TransformWrapper,
     TransformComponent,
-    ReactZoomPanPinchRef,
 } from "react-zoom-pan-pinch";
 import MapMobile from "@/components/ui/map-mob/MapMobile";
 
@@ -23,7 +22,7 @@ const MapPage: React.FC = () => {
     return (
         <>
             {
-                width >= 1000 ?
+                width >= 700 ?
                     <TransformWrapper
                         initialScale={1}
                     >
