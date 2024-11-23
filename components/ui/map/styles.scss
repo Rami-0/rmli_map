@@ -18,19 +18,19 @@
   height: 100%; /* Ensure container adjusts to the height of its parent */
 
   @media(max-width: 768px) {
-    overflow: auto;
-    width: 2560px;
+    width: 100% !important;
+    overflow-x: scroll !important;
   }
 
   img {
-    /* Make sure the image width is always greater than the container */
-    /* Large fixed width for desktop */
+
     object-fit: cover; /* Ensure the image fits without breaking the aspect ratio */
     transform: scale(0.98);
     height: 100%; /* Ensure the image takes the full height of the container */
 
     @media(max-width: 768px) {
       display: block;
+      width: 2560px ;
     }
   }
 }
