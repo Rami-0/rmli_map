@@ -19,6 +19,7 @@
     "@radix-ui/react-label": "^2.1.0",
     "@radix-ui/react-select": "^2.1.2",
     "@radix-ui/react-slot": "^1.1.0",
+    "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "framer-motion": "^11.11.11",
     "lucide-react": "^0.454.0",
@@ -31,6 +32,7 @@
     "react-medium-image-zoom": "^5.2.11",
     "react-zoom-pan-pinch": "^3.6.1",
     "sass": "^1.81.0",
+    "sharp": "^0.33.5",
     "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7"
   },
