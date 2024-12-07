@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import React, { useState, useRef, useEffect } from 'react';
+import Hammer from 'hammerjs';
 import MAP_IMG from '../../../assets/png/map.png';
 import './style.scss';
 import PointDialog from '@/components/shared/popup-window';
@@ -9,100 +10,87 @@ import ZoomOutSVG from '../../../assets/svg/zoomout.svg';
 
 function MapMobile() {
   const [zoom, setZoom] = useState(1);
-  const [origin, setOrigin] = useState({ x: '50%', y: '50%' });
   const [openPopUp, setOpenPopUp] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const initialDistance = useRef<number | null>(null);
-
-  const calculateDistance = (touch1: Touch, touch2: Touch) => {
-    return Math.sqrt(
-      Math.pow(touch2.clientX - touch1.clientX, 2) +
-      Math.pow(touch2.clientY - touch1.clientY, 2)
-    );
-  };
-
-  const handleTouchStart = (e: TouchEvent) => {
-    if (e.touches.length === 2) {
-      initialDistance.current = calculateDistance(e.touches[0], e.touches[1]);
-    }
-  };
-
-  const handleTouchMove = (e: TouchEvent) => {
-    if (e.touches.length === 2 && initialDistance.current) {
-      const currentDistance = calculateDistance(e.touches[0], e.touches[1]);
-      const zoomChange = currentDistance / initialDistance.current;
-
-      setZoom(prevZoom => Math.min(Math.max(prevZoom * zoomChange, 1), 3));
-      initialDistance.current = currentDistance;
-
-      const rect = containerRef.current!.getBoundingClientRect();
-      const offsetX =
-        ((e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left) /
-        rect.width;
-      const offsetY =
-        ((e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top) /
-        rect.height;
-
-      setOrigin({ x: `${offsetX * 100}%`, y: `${offsetY * 100}%` });
-    }
-  };
-
-  const handleTouchEnd = () => {
-    initialDistance.current = null;
-  };
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (container) {
-      container.addEventListener('touchstart', handleTouchStart);
-      container.addEventListener('touchmove', handleTouchMove);
-      container.addEventListener('touchend', handleTouchEnd);
-    }
-
-    return () => {
-      if (container) {
-        container.removeEventListener('touchstart', handleTouchStart);
-        container.removeEventListener('touchmove', handleTouchMove);
-        container.removeEventListener('touchend', handleTouchEnd);
-      }
-    };
-  }, []);
-
-  const handleZoomBack = () => {
-    setOrigin({ x: '50%', y: '50%' });
-    setZoom(1);
-  };
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
 
   const handleClickPoint = (e: React.MouseEvent) => {
     e.stopPropagation();
     setOpenPopUp(true);
   };
 
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    const image = imageRef.current;
+
+    if (wrapper && image) {
+      const hammer = new Hammer(wrapper);
+
+      // Настройка жестов
+      hammer.get('pinch').set({ enable: true });
+      hammer.get('pan').set({ direction: Hammer.DIRECTION_ALL });
+      hammer.get('doubletap').set({ enable: true });
+
+      let initialScale = 1;
+      let currentScale = 1;
+
+      // Пинч-зум
+      hammer.on('pinchstart', () => {
+        initialScale = currentScale;
+      });
+
+      hammer.on('pinch', (e) => {
+        currentScale = Math.max(1, Math.min(initialScale * e.scale, 3));
+        setZoom(currentScale);
+      });
+
+      // Двойной клик
+      hammer.on('doubletap', () => {
+        setZoom(prevZoom => prevZoom === 1 ? 2 : 1);
+      });
+    }
+  }, []);
+
+  const handleZoomIn = () => {
+    setZoom(prevZoom => Math.min(prevZoom + 0.5, 3));
+  };
+
+  const handleZoomOut = () => {
+    setZoom(prevZoom => Math.max(prevZoom - 0.5, 1));
+  };
+
+  const handleResetZoom = () => {
+    setZoom(1);
+  };
+
   return (
     <>
       <nav>
-        <div onClick={() => setZoom(prevZoom => Math.min(prevZoom + 0.5, 3))} className="btn">
+        <div onClick={handleZoomIn} className="btn">
           <Image src={ZoomInSVG} alt="zoomin" />
         </div>
-        <div onClick={() => setZoom(prevZoom => Math.max(prevZoom - 0.5, 1))} className="btn">
+        <div onClick={handleZoomOut} className="btn">
           <Image src={ZoomOutSVG} alt="zoomout" />
         </div>
-        <div onClick={handleZoomBack} className="btn">
+        <div onClick={handleResetZoom} className="btn">
           <Image src={ZoomBackSVG} alt="zoomback" />
         </div>
       </nav>
       <div
-        ref={containerRef}
+        ref={wrapperRef}
         className="wrapper"
-        style={{
-          transform: `scale(${zoom})`,
-          transformOrigin: `${origin.x} ${origin.y}`,
-          transition: 'transform 0.3s ease',
-          touchAction: 'none',
-        }}
       >
         <div>
-          <Image src={MAP_IMG} alt="map" />
+          <Image
+            ref={imageRef}
+            src={MAP_IMG}
+            alt="map"
+            style={{
+              transform: `scale(${zoom})`,
+              transition: 'transform 0.3s ease',
+              transformOrigin: 'center center'
+            }}
+          />
           <div onClick={handleClickPoint} className="point"></div>
         </div>
       </div>
