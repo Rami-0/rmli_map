@@ -1,28 +1,19 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
-import CustomButton from '@/components/shared/custom-button';
-import Container from '@/components/ui/container';
+import frame from '@/assets/png/frame-white-desktop.png';
+import frame_mobile from '@/assets/png/frame-white-mobile.png';
+import Image from 'next/image';
+import useWindowDimensions from '@/hooks/useDimensions';
 
 export default function Home() {
-  const t = useTranslations('HomePage');
-  async function handleClick() {
-    fetch('http://localhost:3000/api/users', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-  }
+  const { width = 0 } = useWindowDimensions();
   return (
-    <Container>
-      <h1>{t('title')}</h1>
-      <CustomButton>{t('button')}</CustomButton>
-      <br />
-      <br />
-      <br />
-      <br />
-      <CustomButton onClick={handleClick}> test fetch </CustomButton>
-    </Container>
+    <main className='h-[100vh] w-full bg-black'>
+      {width < 800 ? (
+        <Image src={frame_mobile} objectFit='contain' alt='frame' className='h-[100vh] w-full' />
+      ) : (
+        <Image src={frame} objectFit='contain' alt='frame' className='h-[100vh] w-full' />
+      )}
+    </main>
   );
 }
