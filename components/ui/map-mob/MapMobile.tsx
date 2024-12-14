@@ -1,130 +1,176 @@
-import Image from 'next/image';
-import React, { useState, useRef, useEffect } from 'react';
-import Hammer from 'hammerjs';
-import MAP_IMG from '../../../assets/png/map.png';
-import './style.scss';
-import PointDialog from '@/components/shared/popup-window';
-import ZoomBackSVG from '../../../assets/svg/full.svg';
-import ZoomInSVG from '../../../assets/svg/zoomin.svg';
-import ZoomOutSVG from '../../../assets/svg/zoomout.svg';
-import { useSpring, animated } from '@react-spring/web';
+import image from '@/assets/png/map.png';
+import { animated, useSpring } from '@react-spring/web';
 import { useGesture } from '@use-gesture/react';
+import { MaximizeIcon, MinusIcon, PlusIcon } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 
-import "./styles.module.css"
-
-function MapMobile() {
-  const [zoom, setZoom] = useState(1);
-  const [openPopUp, setOpenPopUp] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
+const MapMobile = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  const [initialScale, setInitialScale] = useState(1);
+  const [bounds, setBounds] = useState({ left: 0, right: 0, top: 0, bottom: 0 });
 
-  const handleClickPoint = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setOpenPopUp(true);
-  };
+  const [{ scale }, scaleApi] = useSpring(() => ({
+    scale: 1,
+    config: { mass: 1, tension: 350, friction: 30 },
+  }));
 
+  const [{ x, y }, api] = useSpring(() => ({
+    x: 0,
+    y: 0,
+    config: { mass: 1, tension: 350, friction: 30 },
+  }));
 
-  const handleZoomIn = () => {
-    setZoom(prevZoom => Math.min(prevZoom + 0.5, 3));
-  };
+  const calculateBounds = (currentScale: number) => {
+    if (containerRef.current && imageRef.current) {
+      const container = containerRef.current.getBoundingClientRect();
+      const image = imageRef.current.getBoundingClientRect();
 
-  const handleZoomOut = () => {
-    setZoom(prevZoom => Math.max(prevZoom - 0.5, 1));
-  };
+      // Calculate the scaled dimensions
+      const scaledWidth = image.width * (currentScale / initialScale);
+      const scaledHeight = image.height * (currentScale / initialScale);
 
-  const handleResetZoom = () => {
-    setZoom(1);
+      // Calculate maximum allowed movement in each direction
+      const horizontalBound = Math.max(0, (scaledWidth - container.width) / 2);
+      const verticalBound = Math.max(0, (scaledHeight - container.height) / 2);
+
+      setBounds({
+        left: -horizontalBound,
+        right: horizontalBound,
+        top: -verticalBound,
+        bottom: verticalBound,
+      });
+    }
   };
 
   useEffect(() => {
-    const handler = (e: Event) => e.preventDefault()
-    document.addEventListener('gesturestart', handler)
-    document.addEventListener('gesturechange', handler)
-    document.addEventListener('gestureend', handler)
-    return () => {
-      document.removeEventListener('gesturestart', handler)
-      document.removeEventListener('gesturechange', handler)
-      document.removeEventListener('gestureend', handler)
+    const calculateInitialScale = () => {
+      if (containerRef.current && imageRef.current) {
+        const container = containerRef.current.getBoundingClientRect();
+        const image = imageRef.current.getBoundingClientRect();
+
+        const scaleX = container.width / image.width;
+        const scaleY = container.height / image.height;
+        const newScale = Math.max(scaleX, scaleY);
+
+        setInitialScale(newScale);
+        scaleApi.start({ scale: newScale });
+        calculateBounds(newScale);
+      }
+    };
+
+    const img = imageRef.current;
+    if (img && img.complete) {
+      calculateInitialScale();
+    } else if (img) {
+      img.onload = calculateInitialScale;
     }
-  }, [])
 
-  const [style, api] = useSpring(() => ({
-    x: 0,
-    y: 0,
-    scale: 1,
-    rotateZ: 0,
-  }))
-  const ref = React.useRef<HTMLDivElement>(null)
+    window.addEventListener('resize', calculateInitialScale);
+    return () => window.removeEventListener('resize', calculateInitialScale);
+  }, []);
 
-  useGesture(
+  const bind = useGesture(
     {
-      // onHover: ({ active, event }) => console.log('hover', event, active),
-      // onMove: ({ event }) => console.log('move', event),
-      onDrag: ({ pinching, cancel, offset: [x, y], ...rest }) => {
-        if (pinching) return cancel()
-        api.start({ x, y })
-      },
-      onPinch: ({ origin: [ox, oy], first, movement: [ms], offset: [s, a], memo }) => {
-        if (first) {
-          const { width, height, x, y } = ref.current!.getBoundingClientRect()
-          const tx = ox - (x + width / 2)
-          const ty = oy - (y + height / 2)
-          memo = [style.x.get(), style.y.get(), tx, ty]
+      onDrag: ({ offset: [dx, dy], pinching }) => {
+        if (!pinching) {
+          api.start({ x: dx, y: dy });
         }
-
-        const x = memo[0] - (ms - 1) * memo[2]
-        const y = memo[1] - (ms - 1) * memo[3]
-        api.start({ scale: s, rotateZ: a, x, y })
-        return memo
+      },
+      onPinch: ({ offset: [d] }) => {
+        const newScale = Math.min(Math.max(initialScale * 0.8, d), initialScale * 4);
+        scaleApi.start({ scale: newScale });
+        calculateBounds(newScale);
       },
     },
     {
-      target: ref,
-      drag: { from: () => [style.x.get(), style.y.get()] },
-      pinch: { scaleBounds: { min: 0.5, max: 2 }, rubberband: true },
-    }
-  )
+      drag: {
+        from: () => [x.get(), y.get()],
+        rubberband: true,
+        bounds: bounds,
+      },
+      pinch: {
+        modifierKey: null,
+        scaleBounds: { min: initialScale * 0.8, max: initialScale * 4 },
+        rubberband: true,
+      },
+    },
+  );
 
+  const handleZoomIn = () => {
+    const newScale = Math.min(scale.get() + initialScale * 0.5, initialScale * 4);
+    scaleApi.start({ scale: newScale });
+    calculateBounds(newScale);
+  };
+
+  const handleZoomOut = () => {
+    const newScale = Math.max(scale.get() - initialScale * 0.5, initialScale * 0.8);
+    scaleApi.start({ scale: newScale });
+    calculateBounds(newScale);
+  };
+
+  const handleReset = () => {
+    scaleApi.start({ scale: initialScale });
+    api.start({ x: 0, y: 0 });
+    calculateBounds(initialScale);
+  };
 
   return (
-    <>
-      <nav>
-        <div onClick={handleZoomIn} className="btn">
-          <Image src={ZoomInSVG} alt="zoomin" />
-        </div>
-        <div onClick={handleZoomOut} className="btn">
-          <Image src={ZoomOutSVG} alt="zoomout" />
-        </div>
-        <div onClick={handleResetZoom} className="btn">
-          <Image src={ZoomBackSVG} alt="zoomback" />
-        </div>
-      </nav>
-      <div
-        className="wrapper"
-        ref={ref}
-      >
-        <animated.div
+    <div ref={containerRef} className='relative h-screen w-full overflow-hidden bg-white'>
+      {/* Controls */}
+      <div className='absolute right-4 top-4 z-10 flex flex-col gap-2'>
+        <button
+          onClick={handleZoomIn}
+          className='rounded-full bg-white p-2 shadow-lg hover:bg-gray-50'
         >
-          <Image
-            src={MAP_IMG}
-            alt="map"
+          <PlusIcon className='h-6 w-6' />
+        </button>
+        <button
+          onClick={handleZoomOut}
+          className='rounded-full bg-white p-2 shadow-lg hover:bg-gray-50'
+        >
+          <MinusIcon className='h-6 w-6' />
+        </button>
+        <button
+          onClick={handleReset}
+          className='rounded-full bg-white p-2 shadow-lg hover:bg-gray-50'
+        >
+          <MaximizeIcon className='h-6 w-6' />
+        </button>
+      </div>
+
+      {/* Map Container */}
+      <div className='h-full w-full touch-none'>
+        <animated.div
+          {...bind()}
+          style={{
+            x,
+            y,
+            scale,
+            touchAction: 'none',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '100%',
+            width: '100%',
+            transform: 'translate3d(0px, 0px, 0px)',
+          }}
+        >
+          <img
+            ref={imageRef}
+            src={image.src}
+            alt='Map'
+            className='h-auto w-full max-w-none object-contain'
             style={{
-              transform: `scale(${zoom})`,
-              transition: 'transform 0.3s ease',
-              transformOrigin: 'center center'
+              transformOrigin: 'center center',
+              willChange: 'transform',
             }}
+            draggable='false'
           />
-          {/* <div onClick={handleClickPoint} className="point"></div> */}
         </animated.div>
       </div>
-      <PointDialog
-        open={openPopUp}
-        onClose={() => setOpenPopUp(false)}
-        title="Point information"
-        description="Some information"
-      />
-    </>
+    </div>
   );
-}
+};
 
 export default MapMobile;
