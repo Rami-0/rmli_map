@@ -7,6 +7,10 @@ import PointDialog from '@/components/shared/popup-window';
 import ZoomBackSVG from '../../../assets/svg/full.svg';
 import ZoomInSVG from '../../../assets/svg/zoomin.svg';
 import ZoomOutSVG from '../../../assets/svg/zoomout.svg';
+import { useSpring, animated } from '@react-spring/web';
+import { useGesture } from '@use-gesture/react';
+
+import "./styles.module.css"
 
 function MapMobile() {
   const [zoom, setZoom] = useState(1);
@@ -19,37 +23,6 @@ function MapMobile() {
     setOpenPopUp(true);
   };
 
-  useEffect(() => {
-    const wrapper = wrapperRef.current;
-    const image = imageRef.current;
-
-    if (wrapper && image) {
-      const hammer = new Hammer(wrapper);
-
-      // Настройка жестов
-      hammer.get('pinch').set({ enable: true });
-      hammer.get('pan').set({ direction: Hammer.DIRECTION_ALL });
-      hammer.get('doubletap').set({ enable: true });
-
-      let initialScale = 1;
-      let currentScale = 1;
-
-      // Пинч-зум
-      hammer.on('pinchstart', () => {
-        initialScale = currentScale;
-      });
-
-      hammer.on('pinch', (e) => {
-        currentScale = Math.max(1, Math.min(initialScale * e.scale, 3));
-        setZoom(currentScale);
-      });
-
-      // Двойной клик
-      hammer.on('doubletap', () => {
-        setZoom(prevZoom => prevZoom === 1 ? 2 : 1);
-      });
-    }
-  }, []);
 
   const handleZoomIn = () => {
     setZoom(prevZoom => Math.min(prevZoom + 0.5, 3));
@@ -62,6 +35,56 @@ function MapMobile() {
   const handleResetZoom = () => {
     setZoom(1);
   };
+
+  useEffect(() => {
+    const handler = (e: Event) => e.preventDefault()
+    document.addEventListener('gesturestart', handler)
+    document.addEventListener('gesturechange', handler)
+    document.addEventListener('gestureend', handler)
+    return () => {
+      document.removeEventListener('gesturestart', handler)
+      document.removeEventListener('gesturechange', handler)
+      document.removeEventListener('gestureend', handler)
+    }
+  }, [])
+
+  const [style, api] = useSpring(() => ({
+    x: 0,
+    y: 0,
+    scale: 1,
+    rotateZ: 0,
+  }))
+  const ref = React.useRef<HTMLDivElement>(null)
+
+  useGesture(
+    {
+      // onHover: ({ active, event }) => console.log('hover', event, active),
+      // onMove: ({ event }) => console.log('move', event),
+      onDrag: ({ pinching, cancel, offset: [x, y], ...rest }) => {
+        if (pinching) return cancel()
+        api.start({ x, y })
+      },
+      onPinch: ({ origin: [ox, oy], first, movement: [ms], offset: [s, a], memo }) => {
+        if (first) {
+          const { width, height, x, y } = ref.current!.getBoundingClientRect()
+          const tx = ox - (x + width / 2)
+          const ty = oy - (y + height / 2)
+          memo = [style.x.get(), style.y.get(), tx, ty]
+        }
+
+        const x = memo[0] - (ms - 1) * memo[2]
+        const y = memo[1] - (ms - 1) * memo[3]
+        api.start({ scale: s, rotateZ: a, x, y })
+        return memo
+      },
+    },
+    {
+      target: ref,
+      drag: { from: () => [style.x.get(), style.y.get()] },
+      pinch: { scaleBounds: { min: 0.5, max: 2 }, rubberband: true },
+    }
+  )
+
 
   return (
     <>
@@ -77,12 +100,12 @@ function MapMobile() {
         </div>
       </nav>
       <div
-        ref={wrapperRef}
         className="wrapper"
+        ref={ref}
       >
-        <div>
+        <animated.div
+        >
           <Image
-            ref={imageRef}
             src={MAP_IMG}
             alt="map"
             style={{
@@ -91,8 +114,8 @@ function MapMobile() {
               transformOrigin: 'center center'
             }}
           />
-          <div onClick={handleClickPoint} className="point"></div>
-        </div>
+          {/* <div onClick={handleClickPoint} className="point"></div> */}
+        </animated.div>
       </div>
       <PointDialog
         open={openPopUp}
