@@ -77,3 +77,9 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+.map-container {
+  isolation: isolate;
+  -webkit-user-select: none;
+  user-select: none;
+}
