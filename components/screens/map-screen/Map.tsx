@@ -1,10 +1,10 @@
 import image from '@/assets/png/map.png';
 import { animated, useSpring } from '@react-spring/web';
 import { useGesture } from '@use-gesture/react';
-import { MaximizeIcon, MinusIcon, PlusIcon } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
+import MapController from '../../ui/map-controller/MapController';
 
-const MapMobile = () => {
+const FixedMap = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const [initialScale, setInitialScale] = useState(1);
@@ -43,6 +43,35 @@ const MapMobile = () => {
     }
   };
 
+  const zoomToPoint = (clientX: number, clientY: number, newScale: number) => {
+    if (containerRef.current && imageRef.current) {
+      const container = containerRef.current.getBoundingClientRect();
+      const currentScale = scale.get();
+
+      // Get the relative position within the container
+      const relativeX = clientX - container.left;
+      const relativeY = clientY - container.top;
+
+      // Calculate the current center point
+      const centerX = container.width / 2;
+      const centerY = container.height / 2;
+
+      // Calculate the distance from the click to the center
+      const distanceX = relativeX - centerX;
+      const distanceY = relativeY - centerY;
+
+      // Calculate new position based on scale change
+      const scaleFactor = newScale / currentScale;
+      const newX = x.get() - distanceX * (scaleFactor - 1);
+      const newY = y.get() - distanceY * (scaleFactor - 1);
+
+      // Apply new scale and position
+      scaleApi.start({ scale: newScale });
+      api.start({ x: newX, y: newY });
+      calculateBounds(newScale);
+    }
+  };
+
   useEffect(() => {
     const calculateInitialScale = () => {
       if (containerRef.current && imageRef.current) {
@@ -54,7 +83,7 @@ const MapMobile = () => {
         const newScale = Math.max(scaleX, scaleY);
 
         setInitialScale(newScale);
-        scaleApi.start({ scale: newScale });
+        scaleApi.start({ scale: newScale, immediate: true });
         calculateBounds(newScale);
       }
     };
@@ -74,20 +103,34 @@ const MapMobile = () => {
     {
       onDrag: ({ offset: [dx, dy], pinching }) => {
         if (!pinching) {
-          api.start({ x: dx, y: dy });
+          const { left, right, top, bottom } = bounds;
+          const boundedX = Math.max(left, Math.min(right, dx));
+          const boundedY = Math.max(top, Math.min(bottom, dy));
+          api.start({ x: boundedX, y: boundedY });
         }
       },
-      onPinch: ({ offset: [d] }) => {
+      onPinch: ({ offset: [d], origin: [ox, oy], first }) => {
         const newScale = Math.min(Math.max(initialScale * 0.8, d), initialScale * 4);
-        scaleApi.start({ scale: newScale });
-        calculateBounds(newScale);
+
+        if (first) {
+          zoomToPoint(ox, oy, newScale);
+        } else {
+          scaleApi.start({ scale: newScale });
+          calculateBounds(newScale);
+        }
+      },
+      onDoubleClick: ({ event }) => {
+        event.preventDefault();
+        const currentScale = scale.get();
+        const newScale = currentScale < initialScale * 2 ? initialScale * 2 : initialScale;
+        zoomToPoint(event.clientX, event.clientY, newScale);
       },
     },
     {
       drag: {
         from: () => [x.get(), y.get()],
         rubberband: true,
-        bounds: bounds,
+        bounds,
       },
       pinch: {
         modifierKey: null,
@@ -117,30 +160,10 @@ const MapMobile = () => {
 
   return (
     <div ref={containerRef} className='relative h-screen w-full overflow-hidden bg-white'>
-      {/* Controls */}
-      <div className='absolute right-4 top-4 z-10 flex flex-col gap-2'>
-        <button
-          onClick={handleZoomIn}
-          className='rounded-full bg-white p-2 shadow-lg hover:bg-gray-50'
-        >
-          <PlusIcon className='h-6 w-6' />
-        </button>
-        <button
-          onClick={handleZoomOut}
-          className='rounded-full bg-white p-2 shadow-lg hover:bg-gray-50'
-        >
-          <MinusIcon className='h-6 w-6' />
-        </button>
-        <button
-          onClick={handleReset}
-          className='rounded-full bg-white p-2 shadow-lg hover:bg-gray-50'
-        >
-          <MaximizeIcon className='h-6 w-6' />
-        </button>
-      </div>
+      <MapController zoomIn={handleZoomIn} zoomOut={handleZoomOut} resetTransform={handleReset} />
 
       {/* Map Container */}
-      <div className='h-full w-full touch-none'>
+      <div className='z-0 h-full w-full touch-none'>
         <animated.div
           {...bind()}
           style={{
@@ -156,21 +179,23 @@ const MapMobile = () => {
             transform: 'translate3d(0px, 0px, 0px)',
           }}
         >
-          <img
-            ref={imageRef}
-            src={image.src}
-            alt='Map'
-            className='h-auto w-full max-w-none object-contain'
-            style={{
-              transformOrigin: 'center center',
-              willChange: 'transform',
-            }}
-            draggable='false'
-          />
+          <div className='relative'>
+            <img
+              ref={imageRef}
+              src={image.src}
+              alt='Map'
+              className='h-auto w-full max-w-none object-contain'
+              style={{
+                transformOrigin: 'center center',
+                willChange: 'transform',
+              }}
+              draggable='false'
+            />
+          </div>
         </animated.div>
       </div>
     </div>
   );
 };
 
-export default MapMobile;
+export default FixedMap;
