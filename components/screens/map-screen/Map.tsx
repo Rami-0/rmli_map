@@ -86,6 +86,7 @@ const FixedMap = () => {
   };
 
   useEffect(() => {
+    // Calculate the initial scale and bounds
     const calculateInitialScale = () => {
       if (containerRef.current && imageRef.current) {
         const container = containerRef.current.getBoundingClientRect();
@@ -109,16 +110,16 @@ const FixedMap = () => {
     }
 
     // Prevent default touchpad gestures at the document level
-    const preventDefaultGesture = (e: TouchEvent) => {
-      if (e.touches.length > 1) {
-        e.preventDefault();
-      }
+    const preventDefaultGesture = (e: Event) => {
+      e.preventDefault();
     };
 
+    document.addEventListener('wheel', preventDefaultGesture, { passive: false });
     document.addEventListener('touchmove', preventDefaultGesture, { passive: false });
     window.addEventListener('resize', calculateInitialScale);
 
     return () => {
+      document.removeEventListener('wheel', preventDefaultGesture);
       document.removeEventListener('touchmove', preventDefaultGesture);
       window.removeEventListener('resize', calculateInitialScale);
     };
