@@ -2,9 +2,9 @@
 
 import React from 'react';
 import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch';
+import FixedMap from '@/components/screens/map-screen/Map';
 import Map from '@/components/ui/map';
 import MapController from '@/components/ui/map-controller/MapController';
-import MapMobile from '@/components/ui/map-mob/MapMobile';
 import useWindowDimensions from '@/hooks/useDimensions';
 
 const MapPage: React.FC = () => {
@@ -27,7 +27,7 @@ const MapPage: React.FC = () => {
           )}
         </TransformWrapper>
       ) : (
-        <MapMobile />
+        <FixedMap />
       )}
     </>
   );
