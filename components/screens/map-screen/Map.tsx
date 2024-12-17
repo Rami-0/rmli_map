@@ -160,8 +160,6 @@ const FixedMap = () => {
         ensureVisibility();
       },
       onWheel: ({ event, delta: [, dy], ctrlKey }) => {
-        event.preventDefault();
-
         console.log('wheel');
 
         // Handle touchpad pinch-to-zoom
@@ -209,7 +207,6 @@ const FixedMap = () => {
         preventDefault: true,
       },
       wheel: {
-        preventDefault: true,
         eventOptions: { passive: false },
       },
     },

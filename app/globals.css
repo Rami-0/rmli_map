@@ -82,4 +82,5 @@ body {
   isolation: isolate;
   -webkit-user-select: none;
   user-select: none;
+  touch-action: none;
 }
