@@ -72,7 +72,21 @@ const FixedMap = () => {
     }
   };
 
+  const ensureVisibility = () => {
+    const currentX = x.get();
+    const currentY = y.get();
+    const { left, right, top, bottom } = bounds;
+
+    const boundedX = Math.max(left, Math.min(right, currentX));
+    const boundedY = Math.max(top, Math.min(bottom, currentY));
+
+    if (boundedX !== currentX || boundedY !== currentY) {
+      api.start({ x: boundedX, y: boundedY });
+    }
+  };
+
   useEffect(() => {
+    // Calculate the initial scale and bounds
     const calculateInitialScale = () => {
       if (containerRef.current && imageRef.current) {
         const container = containerRef.current.getBoundingClientRect();
@@ -95,8 +109,20 @@ const FixedMap = () => {
       img.onload = calculateInitialScale;
     }
 
+    // Prevent default touchpad gestures at the document level
+    const preventDefaultGesture = (e: Event) => {
+      e.preventDefault();
+    };
+
+    document.addEventListener('wheel', preventDefaultGesture, { passive: false });
+    document.addEventListener('touchmove', preventDefaultGesture, { passive: false });
     window.addEventListener('resize', calculateInitialScale);
-    return () => window.removeEventListener('resize', calculateInitialScale);
+
+    return () => {
+      document.removeEventListener('wheel', preventDefaultGesture);
+      document.removeEventListener('touchmove', preventDefaultGesture);
+      window.removeEventListener('resize', calculateInitialScale);
+    };
   }, []);
 
   const bind = useGesture(
@@ -109,7 +135,11 @@ const FixedMap = () => {
           api.start({ x: boundedX, y: boundedY });
         }
       },
+      onDragEnd: () => {
+        ensureVisibility();
+      },
       onPinch: ({ offset: [d], origin: [ox, oy], first }) => {
+        console.log('pinch');
         const newScale = Math.min(Math.max(initialScale * 0.8, d), initialScale * 4);
 
         if (first) {
@@ -119,8 +149,43 @@ const FixedMap = () => {
           calculateBounds(newScale);
         }
       },
+      onPinchEnd: () => {
+        console.log('pinch end');
+        // make sure that the image is visible within the container
+        ensureVisibility();
+      },
+      onWheelEnd: () => {
+        console.log('wheel end');
+        // make sure that the image is visible within the container
+        ensureVisibility();
+      },
+      onWheel: ({ event, delta: [, dy], ctrlKey }) => {
+        console.log('wheel');
+
+        // Handle touchpad pinch-to-zoom
+        if (ctrlKey) {
+          const currentScale = scale.get();
+          const zoomFactor = -dy * 0.01;
+          const newScale = Math.min(
+            Math.max(currentScale * (1 + zoomFactor), initialScale * 0.8),
+            initialScale * 4,
+          );
+          zoomToPoint(event.pageX, event.pageY, newScale);
+        }
+        // Handle regular mouse wheel/touchpad scroll
+        else {
+          const currentScale = scale.get();
+          const zoomFactor = -dy * 0.002;
+          const newScale = Math.min(
+            Math.max(currentScale * (1 + zoomFactor), initialScale * 0.8),
+            initialScale * 4,
+          );
+          zoomToPoint(event.pageX, event.pageY, newScale);
+        }
+      },
       onDoubleClick: ({ event }) => {
         event.preventDefault();
+        console.log('double click');
         const currentScale = scale.get();
         const newScale = currentScale < initialScale * 2 ? initialScale * 2 : initialScale;
         zoomToPoint(event.clientX, event.clientY, newScale);
@@ -131,11 +196,18 @@ const FixedMap = () => {
         from: () => [x.get(), y.get()],
         rubberband: true,
         bounds,
+        filterTaps: true,
+        preventDefault: true,
       },
       pinch: {
         modifierKey: null,
         scaleBounds: { min: initialScale * 0.8, max: initialScale * 4 },
         rubberband: true,
+        eventOptions: { passive: false },
+        preventDefault: true,
+      },
+      wheel: {
+        eventOptions: { passive: false },
       },
     },
   );
@@ -159,11 +231,15 @@ const FixedMap = () => {
   };
 
   return (
-    <div ref={containerRef} className='relative h-screen w-full overflow-hidden bg-white'>
+    <div
+      ref={containerRef}
+      className='relative h-screen w-full overflow-hidden bg-white'
+      style={{ touchAction: 'none' }}
+    >
       <MapController zoomIn={handleZoomIn} zoomOut={handleZoomOut} resetTransform={handleReset} />
 
       {/* Map Container */}
-      <div className='z-0 h-full w-full touch-none'>
+      <div className='z-0 h-full w-full touch-none select-none'>
         <animated.div
           {...bind()}
           style={{
@@ -184,7 +260,7 @@ const FixedMap = () => {
               ref={imageRef}
               src={image.src}
               alt='Map'
-              className='h-auto w-full max-w-none object-contain'
+              className='h-auto w-full max-w-none select-none object-contain'
               style={{
                 transformOrigin: 'center center',
                 willChange: 'transform',

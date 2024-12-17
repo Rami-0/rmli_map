@@ -10,10 +10,10 @@ export default function Home() {
   const { width = 1200 } = useWindowDimensions();
 
   return (
-    <main className='relative h-screen w-full bg-black'>
+    <main className={'map-container pointer-events-none relative h-screen w-full bg-black'}>
       <div className='relative h-full w-full'>
         {/* Map Container */}
-        <div className='absolute inset-0 z-0'>
+        <div className='pointer-events-auto absolute inset-0 z-0'>
           <MapPage />
         </div>
 
